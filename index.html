@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Träningsplaneraren</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="#" class="brand">Träningsplaneraren</a>
+      <nav>
+        <a href="#skapa" data-view="skapa">Skapa program</a>
+        <a href="#program" data-view="program">Mina program</a>
+        <a href="#journal" data-view="journal">Journal</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Skapa program -->
+    <section id="view-skapa" class="view" hidden>
+      <h1>Skapa ett träningsprogram</h1>
+      <p class="lead">Berätta vad du vill uppnå och hur lång tid du har, så får du ett schema vecka för vecka.</p>
+
+      <form id="create-form" class="card form">
+        <div class="grid">
+          <label class="field">
+            <span>Syfte med träningen</span>
+            <select name="purpose" required>
+              <option value="tavling">Tävling / lopp</option>
+              <option value="kondition">Bättre kondition</option>
+              <option value="styrka">Bli starkare</option>
+              <option value="muskler">Bygga muskler</option>
+              <option value="viktnedgang">Gå ner i vikt</option>
+              <option value="halsa">Allmän hälsa</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Träningsform</span>
+            <select name="sport" required>
+              <option value="lopning">Löpning</option>
+              <option value="cykling">Cykling</option>
+              <option value="langdskidor">Längdskidor</option>
+              <option value="simning">Simning</option>
+              <option value="styrketraning">Styrketräning</option>
+              <option value="blandat">Blandat (styrka + kondition)</option>
+            </select>
+          </label>
+
+          <label class="field" id="distance-field">
+            <span>Distans</span>
+            <select name="distance">
+              <option>5 km</option>
+              <option>10 km</option>
+              <option>Halvmaraton</option>
+              <option>Maraton</option>
+              <option value="">Annat</option>
+            </select>
+          </label>
+
+          <label class="field wide">
+            <span>Tävling eller mål <small>(valfritt)</small></span>
+            <input name="goal" type="text" maxlength="80" placeholder="t.ex. Stockholm Marathon eller ”springa 5 km under 25 min”">
+          </label>
+
+          <fieldset class="field wide">
+            <legend>Tidsperiod</legend>
+            <div class="segmented">
+              <label><input type="radio" name="periodMode" value="weeks" checked> Antal veckor</label>
+              <label><input type="radio" name="periodMode" value="date"> Till ett datum</label>
+            </div>
+          </fieldset>
+
+          <label class="field">
+            <span>Startdatum</span>
+            <input name="startDate" type="date" required>
+          </label>
+
+          <label class="field" id="weeks-field">
+            <span>Antal veckor</span>
+            <input name="weeks" type="number" min="1" max="52" value="12" required>
+          </label>
+
+          <label class="field" id="date-field" hidden>
+            <span id="date-label">Tävlingsdatum</span>
+            <input name="targetDate" type="date">
+          </label>
+
+          <label class="field">
+            <span>Pass per vecka</span>
+            <select name="sessionsPerWeek">
+              <option>2</option>
+              <option selected>3</option>
+              <option>4</option>
+              <option>5</option>
+              <option>6</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Nivå</span>
+            <select name="level">
+              <option value="nyborjare">Nybörjare</option>
+              <option value="van" selected>Van</option>
+              <option value="avancerad">Avancerad</option>
+            </select>
+          </label>
+        </div>
+
+        <p id="create-error" class="error" hidden></p>
+        <button type="submit" class="btn primary">Generera program</button>
+      </form>
+    </section>
+
+    <!-- Mina program -->
+    <section id="view-program" class="view" hidden></section>
+
+    <!-- Journal -->
+    <section id="view-journal" class="view" hidden>
+      <div class="view-head">
+        <h1>Träningsjournal</h1>
+        <button type="button" class="btn primary" data-action="new-entry">+ Nytt inlägg</button>
+      </div>
+      <div id="journal-stats" class="stats"></div>
+      <div id="journal-list"></div>
+    </section>
+  </main>
+
+  <!-- Logga ett pass -->
+  <dialog id="log-dialog">
+    <form id="log-form" class="form">
+      <h2>Logga pass</h2>
+      <input type="hidden" name="programId">
+      <input type="hidden" name="sessionId">
+      <div class="grid">
+        <label class="field">
+          <span>Datum</span>
+          <input name="date" type="date" required>
+        </label>
+        <label class="field">
+          <span>Pass</span>
+          <input name="activity" type="text" maxlength="80" required placeholder="t.ex. Löpning, Helkropp A">
+        </label>
+        <label class="field">
+          <span>Tid (min)</span>
+          <input name="duration" type="number" min="0" max="1440" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span>Distans (km) <small>(valfritt)</small></span>
+          <input name="distance" type="number" min="0" step="0.1" inputmode="decimal">
+        </label>
+        <fieldset class="field wide">
+          <legend>Hur kändes det?</legend>
+          <div class="feelings">
+            <label title="Mycket tungt"><input type="radio" name="feeling" value="1"><span>😫</span></label>
+            <label title="Tungt"><input type="radio" name="feeling" value="2"><span>😕</span></label>
+            <label title="Okej"><input type="radio" name="feeling" value="3"><span>😐</span></label>
+            <label title="Bra"><input type="radio" name="feeling" value="4"><span>🙂</span></label>
+            <label title="Superbra"><input type="radio" name="feeling" value="5"><span>😄</span></label>
+          </div>
+        </fieldset>
+        <label class="field wide">
+          <span>Anteckning</span>
+          <textarea name="note" rows="3" maxlength="1000" placeholder="Hur gick det? Något att tänka på till nästa gång?"></textarea>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" data-action="close-dialog">Avbryt</button>
+        <button type="submit" class="btn primary">Spara</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/generator.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
