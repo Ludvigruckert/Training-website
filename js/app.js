@@ -13,15 +13,28 @@ const formatNumber = (n) => String(n).replace('.', ',');
 let currentProgramId = null;
 
 // ---- Navigering ----
+function showView(name) {
+  document.querySelectorAll('.view').forEach((v) => (v.hidden = v.id !== `view-${name}`));
+  document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.dataset.view === name));
+}
+
 async function route() {
+  const loggedOut = Auth.needsLogin();
+  $('#main-nav').hidden = loggedOut;
+  $('#user-menu').hidden = loggedOut || !Auth.user;
+  $('#user-email').textContent = Auth.user?.email ?? '';
+  if (loggedOut) {
+    showView('login');
+    return;
+  }
+
   const [view, id] = location.hash.slice(1).split('/');
   if (!['skapa', 'program', 'journal'].includes(view)) {
     const programs = await DataStore.getPrograms();
     location.replace(programs.length ? '#program' : '#skapa');
     return;
   }
-  document.querySelectorAll('.view').forEach((v) => (v.hidden = v.id !== `view-${view}`));
-  document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('active', a.dataset.view === view));
+  showView(view);
   if (view === 'program') await renderPrograms(id);
   if (view === 'journal') await renderJournal();
 }
@@ -308,7 +321,77 @@ logForm.addEventListener('submit', async (e) => {
   await DataStore.addEntry(entry);
   if (entry.programId) await setSessionDone(entry.programId, entry.sessionId, true);
   logDialog.close();
-  await route();
+  await // ---- Konto ----
+$('#user-menu').addEventListener('click', async (e) => {
+  if (e.target.closest('[data-action="logout"]')) await Auth.signOut();
 });
 
-route();
+// Erbjud att flytta data som sparats i webbläsaren innan inloggning fanns.
+async function offerImport() {
+  if (!DataStore.localCounts) return;
+  const { programs, entries } = DataStore.localCounts();
+  if (!programs && !entries) return;
+  const ok = confirm(`Du har ${programs} program och ${entries} journalinlägg sparade i den här webbläsaren. Vill du flytta dem till ditt konto?`);
+  if (!ok) return;
+  await DataStore.importLocal();
+  toast('Klart! Datan finns nu på ditt konto.');
+}
+
+// ---- Meddelanden ----
+let toastTimer;
+function toast(text, type = 'success') {
+  const el = $('#toast');
+  el.textContent = text;
+  el.className = `toast ${type}`;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 5000);
+}
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error(e.reason);
+  toast(`Något gick fel: ${e.reason?.message || e.reason}`, 'error');
+});
+
+Auth.init(async (justSignedIn) => {
+  if (justSignedIn) await offerImport();
+  await route();
+}).then(route);
+});
+
+// ---- Konto ----
+$('#user-menu').addEventListener('click', async (e) => {
+  if (e.target.closest('[data-action="logout"]')) await Auth.signOut();
+});
+
+// Erbjud att flytta data som sparats i webbläsaren innan inloggning fanns.
+async function offerImport() {
+  if (!DataStore.localCounts) return;
+  const { programs, entries } = DataStore.localCounts();
+  if (!programs && !entries) return;
+  const ok = confirm(`Du har ${programs} program och ${entries} journalinlägg sparade i den här webbläsaren. Vill du flytta dem till ditt konto?`);
+  if (!ok) return;
+  await DataStore.importLocal();
+  toast('Klart! Datan finns nu på ditt konto.');
+}
+
+// ---- Meddelanden ----
+let toastTimer;
+function toast(text, type = 'success') {
+  const el = $('#toast');
+  el.textContent = text;
+  el.className = `toast ${type}`;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 5000);
+}
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error(e.reason);
+  toast(`Något gick fel: ${e.reason?.message || e.reason}`, 'error');
+});
+
+Auth.init(async (justSignedIn) => {
+  if (justSignedIn) await offerImport();
+  await route();
+}).then(route);

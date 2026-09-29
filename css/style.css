@@ -396,3 +396,40 @@ dialog h2 { margin-bottom: 16px; }
   .session-body { grid-column: 1 / -1; grid-row: 2; }
   .feelings span { width: 44px; height: 44px; }
 }
+
+/* ---- Inloggning ---- */
+.user-menu { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--muted); }
+.auth-card { max-width: 420px; margin: 32px auto 0; }
+.auth-card .form { display: flex; flex-direction: column; gap: 16px; }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: 0.6; cursor: wait; }
+.auth-links { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 16px; }
+.link {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px;
+}
+.link:hover { text-decoration: underline; }
+.message { margin: 0; padding: 10px 12px; border-radius: 10px; font-size: 0.9rem; }
+.message.error { background: var(--high-bg); color: var(--high); }
+.message.success { background: var(--low-bg); color: var(--low); }
+
+/* ---- Meddelanden ---- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-weight: 500;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.2);
+  z-index: 100;
+}
+.toast.success { background: var(--low-bg); color: var(--low); }
+.toast.error { background: var(--high-bg); color: var(--high); }

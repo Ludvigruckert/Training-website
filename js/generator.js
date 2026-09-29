@@ -75,10 +75,14 @@ const Generator = (() => {
   }
   const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
   const round5 = (n) => Math.max(5, Math.round(n / 5) * 5);
+  // UUID v4 – databasen kräver det formatet.
   const uid = () =>
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
-      : Date.now().toString(36) + Math.random().toString(36).slice(2);
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
 
   const session = (day, type, title, duration, intensity, description, extra = {}) => ({
     day,
