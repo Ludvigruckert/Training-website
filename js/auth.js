@@ -115,7 +115,11 @@ const Auth = (() => {
 
   return {
     init,
+    setMode,
     enabled: !!client,
+    get recovering() {
+      return recovering;
+    },
     get user() {
       return user;
     },

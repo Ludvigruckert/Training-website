@@ -433,3 +433,238 @@ dialog h2 { margin-bottom: 16px; }
 }
 .toast.success { background: var(--low-bg); color: var(--low); }
 .toast.error { background: var(--high-bg); color: var(--high); }
+
+/* ---- Startsida ---- */
+.brand span { color: var(--accent); }
+
+body.is-home main { display: none; }
+body.is-home .topbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: linear-gradient(rgb(0 0 0 / 0.6), transparent);
+  border-bottom: 0;
+}
+body.is-home .brand,
+body.is-home nav a,
+body.is-home .user-menu { color: #fff; }
+body.is-home .brand span { color: #6fe0b5; }
+body.is-home nav a:hover { background: rgb(255 255 255 / 0.15); }
+body.is-home nav a.active { background: none; }
+body.is-home .topbar .btn.ghost { color: #fff; border-color: rgb(255 255 255 / 0.45); }
+body.is-home .topbar .btn.ghost:hover { background: rgb(255 255 255 / 0.15); }
+
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  background: #111;
+  color: #fff;
+}
+.hero-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transform: scale(1.08);
+  transition: opacity 1.5s ease, transform 7.5s linear;
+}
+.hero-slide.active { opacity: 1; transform: scale(1); }
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.88) 0%, rgb(0 0 0 / 0.5) 55%, rgb(0 0 0 / 0.35) 100%);
+}
+.hero-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 120px 16px 80px;
+}
+.eyebrow {
+  margin: 0;
+  color: #6fe0b5;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.hero h1 {
+  font-size: clamp(2.6rem, 8vw, 4.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 12px 0 18px;
+}
+.hero-lead {
+  max-width: 560px;
+  margin: 0 0 28px;
+  font-size: 1.15rem;
+  color: rgb(255 255 255 / 0.85);
+}
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn.large { padding: 14px 24px; font-size: 1.05rem; }
+.btn.outline-light {
+  background: rgb(255 255 255 / 0.08);
+  border-color: rgb(255 255 255 / 0.5);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+.btn.outline-light:hover { background: rgb(255 255 255 / 0.18); }
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 56px 16px 72px;
+}
+.feature-num { color: var(--accent); font-weight: 800; font-size: 0.85rem; letter-spacing: 0.08em; }
+.feature h2 { font-size: 1.15rem; margin: 6px 0 8px; }
+.feature p { margin: 0; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-slide { transform: none; transition: opacity 1.5s ease; }
+}
+@media (max-width: 600px) {
+  .features { grid-template-columns: 1fr; gap: 24px; padding: 40px 16px 56px; }
+  .hero-content { padding: 140px 16px 56px; }
+  .hero-actions .btn { flex: 1 1 100%; }
+}
+
+/* ---- Presentationssidor ---- */
+.teaser-head { max-width: 640px; }
+.checklist { list-style: none; margin: 0 0 24px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.checklist li { position: relative; padding-left: 30px; }
+.checklist li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.preview {
+  position: relative;
+  margin-top: 36px;
+  max-height: 720px;
+  overflow: hidden;
+  padding: 44px 20px 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg);
+  box-shadow: var(--shadow), 0 0 0 6px var(--surface-2);
+  user-select: none;
+}
+.preview::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 140px;
+  background: linear-gradient(transparent, var(--bg));
+}
+.preview-label {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.preview .form { margin-bottom: 0; }
+.preview-arrow { text-align: center; color: var(--muted); font-weight: 600; margin: 20px 0 12px; }
+.feature-link { display: inline-block; margin-top: 10px; font-weight: 600; text-decoration: none; }
+.feature-link:hover { text-decoration: underline; }
+.preview .icon-btn { display: none; }
+.preview.tall { max-height: 1320px; }
+
+/* ---- Kompakt meny på mobil ----
+   Rad 1: logga till vänster, Logga in/Logga ut till höger. Rad 2: menyn över hela bredden. */
+@media (max-width: 600px) {
+  .topbar-inner {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 10px 12px 8px;
+  }
+  .topbar nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .topbar nav a {
+    padding: 6px 4px;
+    font-size: 0.875rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+}
+
+/* ---- Hybrid: veckans pass ---- */
+.hint { color: var(--muted); font-size: 0.85rem; font-weight: 400; margin: 0; }
+.mix { background: var(--surface-2); border-radius: 12px; padding: 14px 16px !important; gap: 10px; }
+.mix-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.mix-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mix-row span { font-weight: 500; }
+.mix-row input[type="number"] { width: 72px; flex-shrink: 0; text-align: center; }
+.mix-row input[type="text"] { flex: 1; min-width: 0; }
+.mix-grid.extras { padding-top: 10px; border-top: 1px solid var(--border); }
+.mix-total { margin: 0; font-weight: 600; }
+.mix-total.error { color: var(--danger); }
+
+/* Dubbelpass */
+.slot {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .mix-grid { grid-template-columns: 1fr; }
+}
+
+/* Egna sporter med fasta dagar */
+.extras { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.extra { display: flex; flex-direction: column; gap: 8px; }
+.extra .mix-row input[readonly] { color: var(--muted); background: var(--surface-2); }
+.weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.weekday { cursor: pointer; }
+.weekday input { position: absolute; opacity: 0; width: 0; }
+.weekday span {
+  display: block;
+  padding: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+}
+.weekday input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+.weekday input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (prefers-color-scheme: dark) {
+  .weekday input:checked + span { color: #0b1a14; }
+}

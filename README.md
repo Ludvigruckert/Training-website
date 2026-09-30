@@ -1,10 +1,11 @@
-# Träningsplaneraren
+# Planfit
 
 Skapa träningsprogram utifrån mål, tidsperiod och nivå – och för journal över träningen.
 
 ## Funktioner
 
-- **Programgenerator** – välj syfte (tävling, kondition, styrka, muskler, viktnedgång, hälsa), träningsform, antal veckor eller måldatum, pass per vecka och nivå. Programmet delas in i faser (bas → uppbyggnad → topp → nedtrappning) med återhämtningsveckor.
+- **Programgenerator** – välj syfte (tävling, kondition, styrka, muskler, viktnedgång, hälsa), träningsform (löpning, cykling, Hyrox, styrketräning eller hybrid), antal veckor eller måldatum, 2–12 pass per vecka, antal träningsdagar och nivå. Programmet delas in i faser (bas → uppbyggnad → topp → nedtrappning) med återhämtningsveckor. Fler pass än träningsdagar ger dubbelpass.
+- **Hybrid** – välj själv antal pass per sort (löpning, styrka, cykling, Hyrox, kondition) och lägg till egna sporter, t.ex. padel eller fotboll.
 - **Konton** – logga in med e-post och lösenord (Supabase). Program och journal sparas på kontot.
 - **Träningsjournal** – logga pass med tid, distans, känsla och anteckningar. Pass kan loggas direkt från programmet och markeras då som klara.
 
