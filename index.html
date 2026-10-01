@@ -230,12 +230,12 @@
 
             <div class="perf-section" id="perf-running">
               <h3>Löpning</h3>
-              <p class="hint">Fyll i tiderna du vet (t.ex. 24:30 eller 1:52:00). Tempona i passen räknas ut från dem.</p>
+              <p class="hint">Fyll i tiderna du vet. Skriv bara siffror – kolon läggs till automatiskt (13940 blir 1:39:40). Tempona i passen räknas ut från tiderna.</p>
               <div class="perf-grid">
-                <label class="perf-item"><span>5 km</span><input name="time_5" type="text" inputmode="numeric" placeholder="mm:ss" autocomplete="off"></label>
-                <label class="perf-item"><span>10 km</span><input name="time_10" type="text" inputmode="numeric" placeholder="mm:ss" autocomplete="off"></label>
-                <label class="perf-item"><span>21,1 km</span><input name="time_21" type="text" inputmode="numeric" placeholder="h:mm:ss" autocomplete="off"></label>
-                <label class="perf-item goal" id="goal-time-field"><span id="goal-time-label">Måltid</span><input name="goalTime" type="text" inputmode="numeric" placeholder="h:mm:ss" autocomplete="off"></label>
+                <label class="perf-item"><span>5 km</span><input name="time_5" type="text" inputmode="numeric" data-time placeholder="mm:ss" autocomplete="off"></label>
+                <label class="perf-item"><span>10 km</span><input name="time_10" type="text" inputmode="numeric" data-time placeholder="mm:ss" autocomplete="off"></label>
+                <label class="perf-item"><span>21,1 km</span><input name="time_21" type="text" inputmode="numeric" data-time placeholder="h:mm:ss" autocomplete="off"></label>
+                <label class="perf-item goal" id="goal-time-field"><span id="goal-time-label">Måltid</span><input name="goalTime" type="text" inputmode="numeric" data-time placeholder="h:mm:ss" autocomplete="off"></label>
               </div>
             </div>
 

@@ -171,6 +171,26 @@ function readMix(form) {
 const TIME_FIELDS = { time_5: '5 km', time_10: '10 km', time_21: 'Halvmaraton' };
 const RM_FIELDS = { rm_squat: 'squat', rm_bench: 'bench', rm_deadlift: 'deadlift', rm_ohp: 'ohp' };
 
+// Tidsfälten: mobilens siffertangentbord saknar kolon, så kolon läggs in automatiskt
+// medan man skriver – sekunder och minuter räknas bakifrån: 2430 → 24:30, 13940 → 1:39:40.
+function formatTimeDigits(digits) {
+  const d = digits.slice(0, 6);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, -2)}:${d.slice(-2)}`;
+  return `${d.slice(0, -4)}:${d.slice(-4, -2)}:${d.slice(-2)}`;
+}
+
+createForm.querySelectorAll('[data-time]').forEach((input) => {
+  let previous = input.value;
+  input.addEventListener('input', (e) => {
+    let digits = input.value.replace(/\D/g, '');
+    // Raderade man ett kolon försvinner inga siffror – ta då bort siffran före det i stället.
+    if (e.inputType?.startsWith('delete') && digits === previous.replace(/\D/g, '')) digits = digits.slice(0, -1);
+    input.value = formatTimeDigits(digits);
+    previous = input.value;
+  });
+});
+
 function readPerf(form) {
   const f = form.elements;
   const times = {};
