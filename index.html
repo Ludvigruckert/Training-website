@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Planfit – träningsprogram efter ditt mål</title>
+  <title>Fitsphere – träningsprogram efter ditt mål</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-inner">
-      <a href="#hem" class="brand">Plan<span>fit</span></a>
+      <a href="#hem" class="brand">Fit<span>sphere</span></a>
       <nav id="main-nav" hidden>
         <a href="#skapa" data-view="skapa">Skapa program</a>
         <a href="#program" data-view="program">Mina program</a>
@@ -35,7 +35,7 @@
       <div class="hero-content">
         <p class="eyebrow">Träningsprogram efter ditt mål</p>
         <h1>Sätt målet.<br>Vi gör planen.</h1>
-        <p class="hero-lead">Planfit bygger ditt träningsschema vecka för vecka – för loppet, tävlingen eller formen du jagar. Logga passen och se hur du tar dig dit.</p>
+        <p class="hero-lead">Fitsphere bygger ditt träningsschema vecka för vecka – för loppet, tävlingen eller formen du jagar. Logga passen och se hur du tar dig dit.</p>
         <div class="hero-actions">
           <a id="hero-primary" class="btn primary large" href="#skapa">Skapa ett program</a>
           <a id="hero-secondary" class="btn outline-light large" href="#program">Mina program</a>
@@ -213,14 +213,43 @@
             <small class="hint" id="days-hint"></small>
           </label>
 
-          <label class="field">
-            <span>Nivå</span>
-            <select name="level">
-              <option value="nyborjare">Nybörjare</option>
-              <option value="van" selected>Van</option>
-              <option value="avancerad">Avancerad</option>
-            </select>
-          </label>
+          <fieldset class="field wide perf">
+            <legend>Där du är i dag</legend>
+
+            <div class="perf-section" id="perf-running">
+              <h3>Löpning</h3>
+              <p class="hint">Fyll i tiderna du vet (t.ex. 24:30 eller 1:52:00). Tempona i passen räknas ut från dem.</p>
+              <div class="perf-grid">
+                <label class="perf-item"><span>5 km</span><input name="time_5" type="text" inputmode="numeric" placeholder="mm:ss" autocomplete="off"></label>
+                <label class="perf-item"><span>10 km</span><input name="time_10" type="text" inputmode="numeric" placeholder="mm:ss" autocomplete="off"></label>
+                <label class="perf-item"><span>21,1 km</span><input name="time_21" type="text" inputmode="numeric" placeholder="h:mm:ss" autocomplete="off"></label>
+                <label class="perf-item goal" id="goal-time-field"><span id="goal-time-label">Måltid</span><input name="goalTime" type="text" inputmode="numeric" placeholder="h:mm:ss" autocomplete="off"></label>
+              </div>
+            </div>
+
+            <div class="perf-section" id="perf-strength">
+              <h3>Styrka</h3>
+              <p class="hint">Ditt max för en repetition (1RM) i kg. Passen visar då vilken vikt du ska använda.</p>
+              <div class="perf-grid">
+                <label class="perf-item"><span>Knäböj</span><input name="rm_squat" type="number" min="0" max="500" step="2.5" inputmode="decimal" placeholder="kg"></label>
+                <label class="perf-item"><span>Bänkpress</span><input name="rm_bench" type="number" min="0" max="400" step="2.5" inputmode="decimal" placeholder="kg"></label>
+                <label class="perf-item"><span>Marklyft</span><input name="rm_deadlift" type="number" min="0" max="500" step="2.5" inputmode="decimal" placeholder="kg"></label>
+                <label class="perf-item"><span>Axelpress</span><input name="rm_ohp" type="number" min="0" max="300" step="2.5" inputmode="decimal" placeholder="kg"></label>
+                <label class="perf-item"><span>Kroppsvikt</span><input name="bodyweight" type="number" min="0" max="300" step="0.5" inputmode="decimal" placeholder="kg"></label>
+              </div>
+            </div>
+
+            <label class="perf-level" id="level-field">
+              <span id="level-label">Erfarenhet</span>
+              <select name="level">
+                <option value="nyborjare">Nybörjare</option>
+                <option value="van" selected>Van</option>
+                <option value="avancerad">Avancerad</option>
+              </select>
+              <small class="hint" id="level-hint"></small>
+            </label>
+            <p class="perf-summary" id="perf-summary" hidden></p>
+          </fieldset>
         </div>
 
         <p id="create-error" class="error" hidden></p>
@@ -244,6 +273,53 @@
       <div id="journal-list"></div>
     </section>
   </main>
+
+  <!-- Ändra eller lägg till ett pass -->
+  <dialog id="edit-dialog">
+    <form id="edit-form" class="form">
+      <h2 id="edit-heading">Ändra pass</h2>
+      <div class="grid">
+        <label class="field wide">
+          <span>Pass</span>
+          <input name="sessionTitle" type="text" maxlength="80" required placeholder="t.ex. Lugnt pass, Helkropp A">
+        </label>
+        <label class="field">
+          <span>Datum</span>
+          <input name="date" type="date" required>
+        </label>
+        <label class="field">
+          <span>Tid (min)</span>
+          <input name="duration" type="number" min="0" max="600" inputmode="numeric">
+        </label>
+        <label class="field">
+          <span>Intensitet</span>
+          <select name="intensity">
+            <option>Låg</option>
+            <option>Medel</option>
+            <option>Medel–hög</option>
+            <option>Hög</option>
+            <option>Tävling</option>
+          </select>
+        </label>
+        <label class="field wide">
+          <span>Beskrivning</span>
+          <textarea name="description" rows="4" maxlength="2000"></textarea>
+        </label>
+        <div class="field wide">
+          <span>Övningar</span>
+          <div id="edit-exercises" class="exercise-list"></div>
+          <button type="button" class="btn small ghost" data-action="add-exercise">+ Lägg till övning</button>
+        </div>
+      </div>
+      <p id="edit-error" class="error" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost danger-text" data-action="delete-session">Ta bort pass</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn ghost" data-action="close-edit">Avbryt</button>
+        <button type="submit" class="btn primary">Spara</button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- Logga ett pass -->
   <dialog id="log-dialog">

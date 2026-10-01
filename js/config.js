@@ -5,4 +5,6 @@
 const CONFIG = {
   supabaseUrl: 'https://jrwuzajjsfabkywodrub.supabase.co',
   supabaseKey: 'sb_publishable_Vfe8GNpcRnRoFYcdMui-pQ_ynxNSXZP',
+  // AI-chatten kostar pengar per meddelande (Anthropic API) och är avstängd tills vidare. Se KOM-IHAG.md.
+  aiChat: false,
 };

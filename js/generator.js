@@ -62,6 +62,86 @@ const Generator = (() => {
   const LONG_CAP = { '5 km': 75, '10 km': 95, Halvmaraton: 135, Maraton: 180 };
   const HARD = ['Hög', 'Medel–hög', 'Tävling'];
 
+  // ---- Löptempo (Jack Daniels VDOT) ----
+  // VDOT är ett mått på löpkondition som räknas fram från ett lopp. Ur det fås träningstempon per zon.
+  const RACE_METERS = { '5 km': 5000, '10 km': 10000, Halvmaraton: 21097.5, Maraton: 42195 };
+  const vo2At = (v) => -4.6 + 0.182258 * v + 0.000104 * v * v; // v i m/min
+  const pctMax = (t) => 0.8 + 0.1894393 * Math.exp(-0.012778 * t) + 0.2989558 * Math.exp(-0.1932605 * t); // t i min
+  const vdotFrom = (meters, seconds) => vo2At(meters / (seconds / 60)) / pctMax(seconds / 60);
+  const speedAt = (vo2) => (-0.182258 + Math.sqrt(0.182258 ** 2 + 4 * 0.000104 * (vo2 + 4.6))) / (2 * 0.000104);
+  const paceAt = (vdot, pct) => 60000 / speedAt(vdot * pct); // sekunder per km
+
+  // Förutsagd sluttid (sekunder) på en distans för ett visst VDOT.
+  function predictTime(vdot, meters) {
+    let lo = 60;
+    let hi = 60 * 60 * 10;
+    for (let i = 0; i < 50; i++) {
+      const mid = (lo + hi) / 2;
+      if (vdotFrom(meters, mid) > vdot) lo = mid;
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  function formatPace(sec) {
+    const s = Math.round(sec);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+  function formatTime(sec) {
+    const s = Math.round(sec);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const rest = String(s % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`;
+  }
+
+  /**
+   * Räknar ut träningstempon från nuvarande tider. times = { '5 km': sek, '10 km': sek, Halvmaraton: sek }.
+   * Tiden närmast tävlingsdistansen väger tyngst (den säger mest om just den uthålligheten).
+   */
+  function runningProfile(times = {}, distance = '', goalTime = null) {
+    const known = Object.entries(times).filter(([d, sec]) => RACE_METERS[d] && sec > 0);
+    if (!known.length) return null;
+    const target = RACE_METERS[distance] || 10000;
+    const [refDistance, refTime] = known.reduce((a, b) =>
+      Math.abs(Math.log(RACE_METERS[b[0]] / target)) < Math.abs(Math.log(RACE_METERS[a[0]] / target)) ? b : a);
+    const vdot = vdotFrom(RACE_METERS[refDistance], refTime);
+    const meters = RACE_METERS[distance];
+    const predicted = meters ? predictTime(vdot, meters) : null;
+    const goal = meters && goalTime > 0 ? goalTime : null;
+    return {
+      vdot: Math.round(vdot * 10) / 10,
+      goalVdot: goal ? Math.round(vdotFrom(meters, goal) * 10) / 10 : null,
+      predicted,
+      goalTime: goal,
+      paces: {
+        easy: [paceAt(vdot, 0.7), paceAt(vdot, 0.62)],
+        threshold: paceAt(vdot, 0.88),
+        interval: paceAt(vdot, 0.975),
+        // Tävlingsfart: måltiden om den finns, annars vad nuvarande form räcker till.
+        race: meters ? (goal || predicted) / (meters / 1000) : paceAt(vdot, 0.88),
+      },
+    };
+  }
+
+  const paceRange = ([fast, slow]) => `${formatPace(fast)}–${formatPace(slow)}/km`;
+  const pace = (sec) => `ca ${formatPace(sec)}/km`;
+
+  // ---- Styrka: procent av 1RM ----
+  const LIFT_KEYS = {
+    'Knäböj': 'squat',
+    'Knäböj eller frontböj': 'squat',
+    'Bänkpress': 'bench',
+    'Marklyft': 'deadlift',
+    'Axelpress': 'ohp',
+  };
+  const roundKg = (kg) => Math.round(kg / 2.5) * 2.5;
+  function loadText(pct, liftKey, oneRm = {}) {
+    const max = Number(oneRm[liftKey]);
+    const sv = (n) => String(n).replace('.', ',');
+    return max > 0 ? `${sv(pct)} % · ${sv(roundKg((max * pct) / 100))} kg` : `${sv(pct)} % av max`;
+  }
+
   // ---- Hjälpfunktioner ----
   function parseDate(str) {
     const [y, m, d] = str.split('-').map(Number);
@@ -238,6 +318,23 @@ const Generator = (() => {
   }
 
   function enduranceSession(type, ctx) {
+    const s = enduranceBase(type, ctx);
+    const p = ctx.sport === 'lopning' && ctx.run?.paces;
+    if (!s || !p) return s;
+    // Med kända tider får löppassen konkreta tempon.
+    const paceNote = {
+      lugnt: `Tempo: ${paceRange(p.easy)}.`,
+      langpass: `Tempo: ${paceRange(p.easy)}.`,
+      fartlek: `Lugna delar ${paceRange(p.easy)}, snabba delar ${pace(p.threshold)}.`,
+      intervaller: `Intervalltempo: ${pace(p.interval)}.`,
+      tempo: `Tempo: ${pace(p.threshold)}.`,
+      tavlingsfart: `Tävlingsfart: ${pace(p.race)}.`,
+      skarpt: `Tävlingsfart: ${pace(p.race)}.`,
+    }[type];
+    return paceNote ? { ...s, description: `${s.description} ${paceNote}` } : s;
+  }
+
+  function enduranceBase(type, ctx) {
     const base = BASE_MINUTES[ctx.level] * loadFactor(ctx);
     const step = LEVEL_STEP[ctx.level];
     const act = ACTIVITY[ctx.sport];
@@ -294,10 +391,19 @@ const Generator = (() => {
   };
   // De två första övningarna i varje pass följer fasens set × reps, resten är assistansövningar.
   const MAIN_LIFTS = 2;
+  // [set, reps, procent av 1RM] per fas.
   const SCHEMES = {
-    styrka: { bas: [3, '8'], uppbyggnad: [4, '5'], topp: [5, '3'], nedtrappning: [3, '2–3'] },
-    muskler: { bas: [3, '12'], uppbyggnad: [4, '10'], topp: [4, '8'], nedtrappning: [3, '10'] },
+    styrka: { bas: [3, '8', 70], uppbyggnad: [4, '5', 80], topp: [5, '3', 87.5], nedtrappning: [3, '2', 90] },
+    muskler: { bas: [3, '12', 65], uppbyggnad: [4, '10', 70], topp: [4, '8', 75], nedtrappning: [3, '10', 65] },
   };
+
+  // Set, reps och belastning för en huvudövning. Vikten ökar 2,5 % per vecka inom fasen.
+  function mainLift(goal, ctx, liftKey) {
+    const [phaseSets, reps, basePct] = SCHEMES[goal][ctx.phase];
+    if (ctx.recovery) return { sets: `2 × ${reps}`, load: loadText(60, liftKey, ctx.oneRm) };
+    const step = ctx.phase === 'nedtrappning' ? 0 : Math.min(5, ctx.phaseWeek * 2.5);
+    return { sets: `${phaseSets} × ${reps}`, load: loadText(basePct + step, liftKey, ctx.oneRm) };
+  }
 
   // Helkropp vid få pass, annars över-/underkropp. Rena styrkeprogram fylls på med kondition och rörlighet.
   function strengthPlan(n, withConditioning) {
@@ -317,16 +423,18 @@ const Generator = (() => {
   function strengthSession(type, ctx) {
     const goal = ['styrka', 'tavling'].includes(ctx.purpose) ? 'styrka' : 'muskler';
     if (WORKOUTS[type]) {
-      const [phaseSets, reps] = SCHEMES[goal][ctx.phase];
-      const sets = ctx.recovery ? 2 : phaseSets;
-      const exercises = WORKOUTS[type].exercises.map((name, i) => ({
-        name,
-        sets: i < MAIN_LIFTS ? `${sets} × ${reps}` : `${ctx.recovery ? 2 : 3} × 10–12`,
-      }));
+      // Huvudövningar med känt 1RM (knäböj, bänk, mark, axelpress) får procent och kilo.
+      // Övriga huvudövningar styrs av känsla: ett par reps kvar i tanken.
+      const exercises = WORKOUTS[type].exercises.map((name, i) => {
+        if (i >= MAIN_LIFTS) return { name, sets: `${ctx.recovery ? 2 : 3} × 10–12` };
+        const lift = mainLift(goal, ctx, LIFT_KEYS[name]);
+        return LIFT_KEYS[name] ? { name, ...lift } : { name, sets: lift.sets, load: ctx.recovery ? 'lätt' : '2 reps kvar' };
+      });
       const notes = [];
-      if (ctx.recovery) notes.push('Återhämtningsvecka: kör ca 60 % av dina vanliga vikter.');
-      else if (goal === 'styrka') notes.push('Huvudövningarna tungt med 2–3 min vila. Öka vikten när alla reps går bra.');
+      if (ctx.recovery) notes.push('Återhämtningsvecka: lättare vikter, fokus på teknik.');
+      else if (goal === 'styrka') notes.push('Huvudövningarna tungt med 2–3 min vila. Assistansövningarna med 1–2 reps kvar.');
       else notes.push('Kör nära utmattning (1–2 reps kvar) med 60–90 s vila.');
+      if (!Object.keys(ctx.oneRm || {}).length) notes.push('Fyll i ditt 1RM när du skapar programmet så räknas vikterna ut i kilo.');
       if (ctx.level === 'nyborjare') notes.push('Fokusera på tekniken – börja lätt och öka lite varje vecka.');
       const intensity = ctx.recovery ? 'Låg' : ctx.phase === 'topp' ? 'Hög' : 'Medel';
       const minutes = { nyborjare: 45, van: 60, avancerad: 75 }[ctx.level];
@@ -417,14 +525,14 @@ const Generator = (() => {
         const rounds = clamp(3 + step + Math.round(ctx.progress * 2) - (ctx.phase === 'nedtrappning' ? 2 : 0), 2, 8);
         const list = stations(rounds).map((s) => `${s.name} ${dose(s)}`).join(', ');
         return session(type, 'Compromised running', round5(15 + rounds * 9), 'Hög',
-          `Värm upp 10 min. ${rounds} varv: 1 km löpning i tänkt tävlingsfart, direkt följt av en station – ${list}. Vila 1–2 min mellan varven. Träna på att hitta löprytmen med trötta ben.`);
+          `Värm upp 10 min. ${rounds} varv: 1 km löpning i tänkt tävlingsfart, direkt följt av en station – ${list}. Vila 1–2 min mellan varven. Träna på att hitta löprytmen med trötta ben.`
+          // Hyrox-löpning går ungefär 15 s/km långsammare än tröskeltempo.
+          + (ctx.run ? ` Löptempo: ${pace(ctx.run.paces.threshold + 15)}.` : ''));
       }
       case 'hyroxstyrka': {
-        const [phaseSets, reps] = SCHEMES.styrka[ctx.phase];
-        const sets = ctx.recovery ? 2 : phaseSets;
         const sled = ctx.recovery ? 3 : 5;
         const exercises = [
-          { name: 'Knäböj eller frontböj', sets: `${sets} × ${reps}` },
+          { name: 'Knäböj eller frontböj', ...mainLift('styrka', ctx, 'squat') },
           { name: 'Sled push (tungt)', sets: `${sled} × 20 m` },
           { name: 'Sled pull (tungt)', sets: `${sled} × 20 m` },
           { name: 'Utfallssteg med sandsäck', sets: '3 × 20 steg' },
@@ -552,8 +660,22 @@ const Generator = (() => {
     return interleave([...lists, extras]);
   }
 
-  function buildTips(input, weeks, n, days) {
+  function buildTips(input, weeks, n, days, run) {
     const tips = [];
+    // Hur realistiskt är målet? Tumregel: ungefär 1 VDOT-enhet bättre per 5 veckors träning.
+    if (run?.goalVdot) {
+      const diff = run.goalVdot - run.vdot;
+      const goal = formatTime(run.goalTime);
+      const now = formatTime(run.predicted);
+      tips.push(diff <= 0
+        ? `Din nuvarande form räcker redan till måltiden ${goal} (du klarar ca ${now} i dag) – sikta gärna högre!`
+        : diff <= weeks / 5
+          ? `Måltiden ${goal} är realistisk på ${weeks} veckor. I dag motsvarar din form ca ${now}.`
+          : diff <= weeks / 3
+            ? `Måltiden ${goal} är utmanande men möjlig på ${weeks} veckor. I dag motsvarar din form ca ${now}.`
+            : `Måltiden ${goal} är mycket ambitiös på ${weeks} veckor – i dag motsvarar din form ca ${now}. Fundera på ett delmål.`);
+    }
+    if (run) tips.push('Tempona bygger på dina nuvarande tider. Uppdatera dem efter testpass när formen blir bättre.');
     if (input.purpose === 'tavling') tips.push('De sista veckorna trappas mängden ner så att du är utvilad på tävlingsdagen – lita på planen.');
     if (input.purpose === 'viktnedgang') tips.push('Träningen gör mest nytta ihop med ett måttligt kaloriunderskott och gott om protein.');
     if (input.purpose === 'muskler') tips.push('Ät tillräckligt med protein (ca 1,6–2 g per kg kroppsvikt) och sov ordentligt.');
@@ -614,6 +736,14 @@ const Generator = (() => {
     const raceDay = input.targetDate ? weekday(parseDate(input.targetDate)) : null;
     const runsInProgram = input.sport === 'lopning' || (isHybrid && mix.lopning > 0);
     const distance = runsInProgram ? input.distance || '' : '';
+
+    // Nuvarande prestation: löptider ger tempon, 1RM ger vikter. Nivån räknas fram ur dem.
+    const perf = input.perf || {};
+    const oneRm = Object.fromEntries(Object.entries(perf.oneRm || {})
+      .map(([k, v]) => [k, Number(v)]).filter(([, v]) => v > 0));
+    const hasRunning = runsInProgram || input.sport === 'hyrox' || (isHybrid && mix.hyrox > 0);
+    const run = hasRunning ? runningProfile(perf.times, distance, Number(perf.goalTime) || null) : null;
+    const level = resolveLevel(input, run, oneRm, Number(perf.bodyweight));
     const makeWeek = {
       styrketraning: strengthWeek,
       hyrox: hyroxWeek,
@@ -627,6 +757,10 @@ const Generator = (() => {
       const isLast = i === weeks - 1;
       const ctx = {
         ...input,
+        level,
+        run,
+        oneRm,
+        phaseWeek: i - phases.indexOf(phase),
         distance,
         mix,
         extras,
@@ -663,20 +797,58 @@ const Generator = (() => {
       purpose: input.purpose,
       sport: input.sport,
       distance,
-      level: input.level,
+      level,
       sessionsPerWeek: n,
       days,
       mix,
       extras,
+      perf: { times: perf.times || {}, goalTime: Number(perf.goalTime) || null, oneRm, bodyweight: Number(perf.bodyweight) || null },
+      run: run && {
+        vdot: run.vdot,
+        predicted: run.predicted,
+        goalTime: run.goalTime,
+        paces: { easy: paceRange(run.paces.easy), threshold: pace(run.paces.threshold), interval: pace(run.paces.interval), race: pace(run.paces.race) },
+      },
       weeks,
       startDate: input.startDate,
       endDate: input.targetDate || toISO(addDays(start, weeks * 7 - 1)),
-      tips: buildTips(input, weeks, n, days),
+      tips: buildTips({ ...input, level }, weeks, n, days, run),
       weekList,
     };
   }
 
-  return { generate, LABELS, MIX_ORDER, MAX_SESSIONS, dayRange, mixTotal, parseDate, toISO, addDays, uid };
+  // Nivån (styr mängden träning) räknas fram ur prestationen. Utan uppgifter används vald erfarenhet.
+  function resolveLevel(input, run, oneRm, bodyweight) {
+    if (run && input.sport !== 'styrketraning') return run.vdot < 38 ? 'nyborjare' : run.vdot < 52 ? 'van' : 'avancerad';
+    if (oneRm.squat && bodyweight > 0) {
+      const ratio = oneRm.squat / bodyweight;
+      return ratio < 1 ? 'nyborjare' : ratio < 1.6 ? 'van' : 'avancerad';
+    }
+    return LEVEL_STEP[input.level] != null ? input.level : 'van';
+  }
+
+  // Tolkar "24:30", "1:45:00" eller "24" (minuter) till sekunder.
+  function parseTime(text) {
+    const parts = String(text || '').trim().replace(/[.,]/g, ':').split(':').filter(Boolean).map(Number);
+    if (!parts.length || parts.some((n) => Number.isNaN(n) || n < 0)) return null;
+    if (parts.length === 1) return parts[0] * 60;
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+
+  // Kort sammanfattning för formuläret, t.ex. "Din form motsvarar ca 1:35:00 på halvmaraton …".
+  function describeRunning(times, distance, goalTime) {
+    const run = runningProfile(times, distance, goalTime);
+    if (!run) return null;
+    const label = { '5 km': '5 km', '10 km': '10 km', Halvmaraton: 'halvmaraton', Maraton: 'maraton' }[distance];
+    const now = run.predicted && label ? `Din form motsvarar ca ${formatTime(run.predicted)} på ${label}. ` : '';
+    return `${now}Lugnt tempo ${paceRange(run.paces.easy)}, tröskeltempo ${pace(run.paces.threshold)}, intervalltempo ${pace(run.paces.interval)}.`;
+  }
+
+  return {
+    generate, describeRunning, LABELS, MIX_ORDER, MAX_SESSIONS, RACE_METERS, dayRange, mixTotal, parseTime, formatTime,
+    parseDate, toISO, addDays, uid,
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = Generator;

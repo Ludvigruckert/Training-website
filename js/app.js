@@ -103,6 +103,30 @@ function readMix(form) {
   return { mix, extras };
 }
 
+// Nuvarande prestation: löptider (sekunder), måltid, 1RM och kroppsvikt.
+const TIME_FIELDS = { time_5: '5 km', time_10: '10 km', time_21: 'Halvmaraton' };
+const RM_FIELDS = { rm_squat: 'squat', rm_bench: 'bench', rm_deadlift: 'deadlift', rm_ohp: 'ohp' };
+
+function readPerf(form) {
+  const f = form.elements;
+  const times = {};
+  const invalid = [];
+  for (const [field, distance] of Object.entries(TIME_FIELDS)) {
+    if (!f[field].value.trim()) continue;
+    const sec = Generator.parseTime(f[field].value);
+    if (sec > 0) times[distance] = sec;
+    else invalid.push(f[field]);
+  }
+  let goalTime = null;
+  if (f.goalTime.value.trim() && !f.goalTime.closest('[hidden]')) {
+    goalTime = Generator.parseTime(f.goalTime.value);
+    if (!(goalTime > 0)) invalid.push(f.goalTime);
+  }
+  const oneRm = {};
+  for (const [field, lift] of Object.entries(RM_FIELDS)) if (Number(f[field].value) > 0) oneRm[lift] = Number(f[field].value);
+  return { times, goalTime, oneRm, bodyweight: Number(f.bodyweight.value) || null, invalid };
+}
+
 // Antal olika fasta dagar – så många träningsdagar behövs minst.
 const fixedDayCount = (extras) => new Set(extras.flatMap((e) => e.days)).size;
 
@@ -138,6 +162,31 @@ function syncCreateForm() {
   f.targetDate.required = byDate;
   $('#date-label').textContent = f.purpose.value === 'tavling' ? 'Tävlingsdatum' : 'Måldatum';
 
+  // Vilka prestationsuppgifter som är relevanta beror på sporterna i programmet.
+  const sport = f.sport.value;
+  const mixOf = (k) => hybrid && Number(f[`mix_${k}`].value) > 0;
+  const running = sport === 'lopning' || sport === 'hyrox' || mixOf('lopning') || mixOf('hyrox');
+  const strength = sport === 'styrketraning' || sport === 'hyrox' || mixOf('styrka') || mixOf('hyrox');
+  $('#perf-running').hidden = !running;
+  $('#perf-strength').hidden = !strength;
+  const distanceLabel = { '5 km': '5 km', '10 km': '10 km', Halvmaraton: 'halvmaraton', Maraton: 'maraton' }[f.distance.value];
+  const showGoal = running && !$('#distance-field').hidden && f.purpose.value === 'tavling' && !!distanceLabel;
+  $('#goal-time-field').hidden = !showGoal;
+  $('#goal-time-label').textContent = `Måltid ${distanceLabel || ''}`.trim();
+
+  const perf = readPerf(createForm);
+  const knowsRunning = running && Object.keys(perf.times).length > 0;
+  const knowsStrength = strength && perf.oneRm.squat && perf.bodyweight;
+  // Erfarenhet behövs bara när nivån inte kan räknas ut (t.ex. cykling, eller inga tider ifyllda).
+  $('#level-field').hidden = knowsRunning || (!running && knowsStrength);
+  $('#level-hint').textContent = running || strength
+    ? 'Fyll i uppgifterna ovan så räknas nivån ut automatiskt – annars välj här.'
+    : '';
+  const summary = $('#perf-summary');
+  const text = knowsRunning ? Generator.describeRunning(perf.times, f.distance.value, perf.goalTime) : null;
+  summary.textContent = text || '';
+  summary.hidden = !text;
+
   const total = $('#mix-total');
   total.textContent = n > Generator.MAX_SESSIONS
     ? `Totalt ${n} pass – högst ${Generator.MAX_SESSIONS} pass i veckan går att planera.`
@@ -164,7 +213,7 @@ createForm.addEventListener('change', (e) => {
   syncCreateForm();
 });
 createForm.addEventListener('input', (e) => {
-  if (e.target.type === 'number' && e.target.name !== 'weeks') syncCreateForm();
+  if (!['goal', 'weeks'].includes(e.target.name)) syncCreateForm();
 });
 createForm.elements.startDate.value = todayISO();
 syncCreateForm();
@@ -175,11 +224,16 @@ createForm.addEventListener('submit', async (e) => {
   const byDate = f.periodMode.value === 'date';
   const error = $('#create-error');
   const n = sessionCount(createForm);
+  const perf = readPerf(createForm);
+  createForm.querySelectorAll('.invalid').forEach((el) => el.classList.remove('invalid'));
+  perf.invalid.forEach((el) => el.classList.add('invalid'));
   const problem = byDate && f.targetDate.value <= f.startDate.value
     ? 'Måldatumet måste ligga efter startdatumet.'
     : n < 2 || n > Generator.MAX_SESSIONS
       ? `Välj mellan 2 och ${Generator.MAX_SESSIONS} pass i veckan.`
-      : null;
+      : perf.invalid.length
+        ? 'Kunde inte läsa en av tiderna. Skriv t.ex. 24:30 eller 1:52:00.'
+        : null;
   error.textContent = problem || '';
   error.hidden = !problem;
   if (problem) return;
@@ -192,6 +246,7 @@ createForm.addEventListener('submit', async (e) => {
     level: f.level.value,
     sessionsPerWeek: f.sessionsPerWeek.value,
     days: f.days.value,
+    perf: { times: perf.times, goalTime: perf.goalTime, oneRm: perf.oneRm, bodyweight: perf.bodyweight },
     ...(f.sport.value === 'hybrid' ? readMix(createForm) : {}),
     startDate: f.startDate.value,
     weeks: byDate ? null : f.weeks.value,
@@ -271,6 +326,7 @@ function renderProgramDetail(p, preview = false) {
       <h1>${esc(p.name)}</h1>
       <p class="muted">${formatDate(p.startDate, { day: 'numeric', month: 'long', year: 'numeric' })} – ${formatDate(p.endDate, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       <div class="chips">${chips.map((c) => `<span class="chip">${esc(c)}</span>`).join('')}</div>
+      ${renderPerfInfo(p)}
       <div class="progress"><div style="width:${pct}%"></div></div>
       <p class="muted small">${done} av ${total} pass klara (${pct} %)</p>
     </div>
@@ -278,8 +334,24 @@ function renderProgramDetail(p, preview = false) {
       <summary>Tips för programmet</summary>
       <ul>${p.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
     </details>
+    ${preview || !CONFIG.aiChat ? '' : renderChat(p)}
     <div class="weeks">${p.weekList.map((w, i) => renderWeek(w, i === current)).join('')}</div>
     ${preview ? '' : '<button type="button" class="btn danger" data-action="delete-program">Ta bort programmet</button>'}`;
+}
+
+// Tempon och 1RM som programmet räknats fram från.
+const LIFT_NAMES = { squat: 'Knäböj', bench: 'Bänkpress', deadlift: 'Marklyft', ohp: 'Axelpress' };
+function renderPerfInfo(p) {
+  const rows = [];
+  if (p.run) {
+    const { easy, threshold, interval, race } = p.run.paces;
+    rows.push(['Dina tempon', `Lugnt ${easy} · Tröskel ${threshold} · Intervall ${interval} · Tävlingsfart ${race}`]);
+  }
+  const rm = Object.entries(p.perf?.oneRm || {});
+  if (rm.length) rows.push(['Ditt 1RM', rm.map(([k, v]) => `${LIFT_NAMES[k]} ${formatNumber(v)} kg`).join(' · ')]);
+  return rows.length
+    ? `<dl class="perf-info">${rows.map(([t, d]) => `<div><dt>${t}</dt><dd>${esc(d)}</dd></div>`).join('')}</dl>`
+    : '';
 }
 
 function renderWeek(w, isCurrent) {
@@ -293,12 +365,13 @@ function renderWeek(w, isCurrent) {
         <span class="week-done">${done}/${w.sessions.length}</span>
       </summary>
       <ul class="sessions">${w.sessions.map(renderSession).join('')}</ul>
+      <button type="button" class="btn small ghost add-session" data-action="add-session" data-week="${w.number}">+ Lägg till pass</button>
     </details>`;
 }
 
 function renderSession(s) {
   const exercises = s.exercises
-    ? `<ul class="exercises">${s.exercises.map((e) => `<li><span>${esc(e.name)}</span><span>${esc(e.sets)}</span></li>`).join('')}</ul>`
+    ? `<ul class="exercises">${s.exercises.map((e) => `<li><span>${esc(e.name)}</span><span>${esc(e.sets)}${e.load ? ` <b>@ ${esc(e.load)}</b>` : ''}</span></li>`).join('')}</ul>`
     : '';
   const button = s.done
     ? `<button type="button" class="btn small done" data-action="undo" data-id="${s.id}" title="Markera som ej klar">✓ Klar</button>`
@@ -315,11 +388,15 @@ function renderSession(s) {
           <h3>${esc(s.title)}</h3>
           <span class="tag tag-${INTENSITY_CLASS[s.intensity] || 'mid'}">${esc(s.intensity)}</span>
           ${s.duration ? `<span class="dur">${s.duration} min</span>` : ''}
+          ${s.edited ? '<span class="edited">Ändrad</span>' : ''}
         </div>
         <p>${esc(s.description)}</p>
         ${exercises}
       </div>
-      ${button}
+      <div class="session-actions">
+        ${button}
+        <button type="button" class="btn small ghost edit-btn" data-action="edit" data-id="${s.id}" title="Redigera passet">Ändra</button>
+      </div>
     </li>`;
 }
 
@@ -351,12 +428,323 @@ programView.addEventListener('click', async (e) => {
   }
   if (action === 'undo') {
     await setSessionDone(currentProgramId, id, false);
-    await renderPrograms(currentProgramId);
+    await rerenderProgram();
+  }
+  if (action === 'edit' || action === 'add-session') {
+    const program = await DataStore.getProgram(currentProgramId);
+    const week = program.weekList.find((w) => w.number === Number(btn.dataset.week));
+    openEditDialog(program, action === 'edit' ? findSession(program, id) : null, week);
   }
   if (action === 'delete-program' && confirm('Vill du ta bort programmet? Journalinläggen finns kvar.')) {
     await DataStore.deleteProgram(currentProgramId);
     location.hash = '#program';
   }
+});
+
+// Ritar om programmet men behåller vilka veckor som är uppfällda och var man har scrollat.
+async function rerenderProgram() {
+  const open = [...programView.querySelectorAll('details.week[open] [data-week]')].map((b) => b.dataset.week);
+  const tipsOpen = programView.querySelector('details.tips')?.open;
+  const scroll = window.scrollY;
+  await renderPrograms(currentProgramId);
+  programView.querySelectorAll('details.week').forEach((d) => {
+    const week = d.querySelector('[data-week]')?.dataset.week;
+    if (open.length) d.open = open.includes(week);
+  });
+  if (tipsOpen) programView.querySelector('details.tips').open = true;
+  window.scrollTo(0, scroll);
+}
+
+// Sorterar veckans pass efter datum och numrerar dubbelpass ("Pass 1/2").
+function sortWeek(week) {
+  week.sessions.sort((a, b) => a.date.localeCompare(b.date) || (a.slot || 1) - (b.slot || 1));
+  const perDay = {};
+  week.sessions.forEach((s) => (perDay[s.date] = (perDay[s.date] || 0) + 1));
+  const seen = {};
+  week.sessions.forEach((s) => {
+    s.slot = seen[s.date] = (seen[s.date] || 0) + 1;
+    s.slots = perDay[s.date];
+    s.day = (parseDate(s.date).getDay() + 6) % 7;
+  });
+}
+
+const weekForDate = (program, date) =>
+  program.weekList.find((w) => w.startDate <= date && date <= toISO(addDays(parseDate(w.startDate), 6)));
+
+// ---- Redigera pass ----
+const editDialog = $('#edit-dialog');
+const editForm = $('#edit-form');
+let editing = null; // { programId, sessionId } – sessionId saknas när ett nytt pass läggs till
+
+function exerciseRow(e = {}) {
+  return `
+    <div class="exercise-row">
+      <input name="ex_name" value="${esc(e.name)}" placeholder="Övning" aria-label="Övning" maxlength="60">
+      <input name="ex_sets" value="${esc(e.sets)}" placeholder="3 × 10" aria-label="Set × reps" maxlength="30">
+      <input name="ex_load" value="${esc(e.load)}" placeholder="Vikt, t.ex. 80 kg" aria-label="Vikt" maxlength="40">
+      <button type="button" class="icon-btn" data-action="remove-exercise" title="Ta bort övningen">✕</button>
+    </div>`;
+}
+
+function openEditDialog(program, session, week) {
+  editing = { programId: program.id, sessionId: session?.id ?? null };
+  const f = editForm.elements;
+  editForm.reset();
+  $('#edit-heading').textContent = session ? 'Ändra pass' : 'Lägg till pass';
+  f.sessionTitle.value = session?.title ?? '';
+  f.date.value = session?.date ?? week?.startDate ?? todayISO();
+  f.date.min = program.weekList[0].startDate;
+  f.date.max = toISO(addDays(parseDate(program.weekList[program.weekList.length - 1].startDate), 6));
+  f.duration.value = session?.duration ?? '';
+  f.intensity.value = session?.intensity ?? 'Medel';
+  f.description.value = session?.description ?? '';
+  $('#edit-exercises').innerHTML = (session?.exercises || []).map(exerciseRow).join('');
+  editForm.querySelector('[data-action="delete-session"]').hidden = !session;
+  $('#edit-error').hidden = true;
+  editDialog.showModal();
+}
+
+editForm.addEventListener('click', async (e) => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action === 'close-edit') editDialog.close();
+  if (action === 'add-exercise') {
+    $('#edit-exercises').insertAdjacentHTML('beforeend', exerciseRow());
+    $('#edit-exercises').lastElementChild.querySelector('input').focus();
+  }
+  if (action === 'remove-exercise') e.target.closest('.exercise-row').remove();
+  if (action === 'delete-session' && confirm('Ta bort passet från programmet?')) {
+    const program = await DataStore.getProgram(editing.programId);
+    program.weekList.forEach((w) => {
+      w.sessions = w.sessions.filter((s) => s.id !== editing.sessionId);
+      sortWeek(w);
+    });
+    await DataStore.saveProgram(program);
+    editDialog.close();
+    await rerenderProgram();
+  }
+});
+
+editForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = editForm.elements;
+  const program = await DataStore.getProgram(editing.programId);
+  const week = weekForDate(program, f.date.value);
+  if (!week) {
+    $('#edit-error').textContent = 'Datumet ligger utanför programmet.';
+    $('#edit-error').hidden = false;
+    return;
+  }
+  const exercises = [...editForm.querySelectorAll('.exercise-row')]
+    .map((row) => ({
+      name: row.querySelector('[name="ex_name"]').value.trim(),
+      sets: row.querySelector('[name="ex_sets"]').value.trim(),
+      load: row.querySelector('[name="ex_load"]').value.trim() || undefined,
+    }))
+    .filter((x) => x.name);
+  const old = editing.sessionId ? findSession(program, editing.sessionId) : null;
+  const updated = {
+    ...(old || { id: uid(), type: 'egen', done: false }),
+    title: f.sessionTitle.value.trim(),
+    date: f.date.value,
+    duration: f.duration.value ? Number(f.duration.value) : null,
+    intensity: f.intensity.value,
+    description: f.description.value.trim(),
+    exercises: exercises.length ? exercises : undefined,
+    edited: true,
+  };
+  // Ta bort det gamla passet (det kan ha flyttats till en annan vecka) och lägg in det nya.
+  program.weekList.forEach((w) => (w.sessions = w.sessions.filter((s) => s.id !== updated.id)));
+  week.sessions.push(updated);
+  program.weekList.forEach(sortWeek);
+  await DataStore.saveProgram(program);
+  editDialog.close();
+  await rerenderProgram();
+});
+
+// ---- AI-chatt ----
+// Användaren beskriver en ändring, AI:n (Supabase-funktionen plan-chat) föreslår ändringar
+// som visas här och bara genomförs när användaren godkänner dem.
+const chat = { programId: null, messages: [], busy: false, open: false };
+
+const dayLabel = (iso) => formatDate(iso, { weekday: 'short', day: 'numeric', month: 'short' });
+
+function renderChat(p) {
+  if (chat.programId !== p.id) Object.assign(chat, { programId: p.id, messages: [], busy: false });
+  const body = !DataStore.client
+    ? '<p class="muted small">AI-chatten kräver inloggning.</p>'
+    : `
+      <div class="chat-log">
+        ${chat.messages.length ? chat.messages.map(renderChatMessage).join('') : `
+          <p class="muted small">Beskriv vad du vill ändra, t.ex. ”Byt tisdagens intervaller mot ett cykelpass på 60 min”,
+          ”Jag kan inte träna på fredagar” eller ”Gör styrkepassen i vecka 3 lättare”. Du får se förslaget innan något ändras.</p>`}
+        ${chat.busy ? '<div class="chat-msg assistant"><p class="thinking">Tänker…</p></div>' : ''}
+      </div>
+      <form class="chat-form" data-chat-form>
+        <textarea name="message" rows="2" maxlength="2000" required placeholder="Vad vill du ändra?" ${chat.busy ? 'disabled' : ''}></textarea>
+        <button type="submit" class="btn primary" ${chat.busy ? 'disabled' : ''}>Skicka</button>
+      </form>`;
+  return `
+    <details class="card ai-chat" ${chat.open || chat.messages.length ? 'open' : ''}>
+      <summary>Ändra med AI</summary>
+      ${body}
+    </details>`;
+}
+
+function renderChatMessage(m, index) {
+  if (m.role === 'user') return `<div class="chat-msg user"><p>${esc(m.content)}</p></div>`;
+  const changes = m.changes?.length ? `
+    <ul class="chat-changes">${m.changes.map((c) => `<li class="change-${c.action}">${esc(c.label)}</li>`).join('')}</ul>
+    ${m.status === 'pending' ? `
+      <div class="chat-actions">
+        <button type="button" class="btn small primary" data-action="chat-apply" data-index="${index}">Godkänn ändringarna</button>
+        <button type="button" class="btn small ghost" data-action="chat-reject" data-index="${index}">Avvisa</button>
+      </div>` : `<p class="chat-status">${m.status === 'applied' ? '✓ Ändringarna är genomförda' : 'Avvisat'}</p>`}` : '';
+  return `<div class="chat-msg assistant${m.error ? ' error' : ''}"><p>${esc(m.content)}</p>${changes}</div>`;
+}
+
+// Kompakt version av programmet som skickas till AI:n.
+function programForAI(p) {
+  return {
+    namn: p.name,
+    mål: p.goal,
+    syfte: LABELS.purpose[p.purpose],
+    träningsform: LABELS.sport[p.sport],
+    distans: p.distance || undefined,
+    idag: todayISO(),
+    tempon: p.run?.paces,
+    oneRepMax: p.perf?.oneRm,
+    veckor: p.weekList.map((w) => ({
+      vecka: w.number,
+      fas: LABELS.phase[w.phase] + (w.recovery ? ' (återhämtning)' : ''),
+      sessions: w.sessions.map((s) => ({
+        id: s.id,
+        date: s.date,
+        veckodag: formatDate(s.date, { weekday: 'long' }),
+        title: s.title,
+        duration: s.duration,
+        intensity: s.intensity,
+        description: s.description,
+        exercises: s.exercises,
+        klar: s.done || undefined,
+      })),
+    })),
+  };
+}
+
+// Gör AI:ns ändringar läsbara, t.ex. "tis 4 nov: Intervaller → Cykelpass".
+function describeChanges(program, changes) {
+  return changes.map((c) => {
+    const old = c.id ? findSession(program, c.id) : null;
+    const s = c.session;
+    let label;
+    if (c.action === 'delete') label = old ? `Ta bort: ${dayLabel(old.date)} – ${old.title}` : 'Ta bort ett pass';
+    else if (c.action === 'add') label = `Nytt pass: ${dayLabel(s.date)} – ${s.title}${s.duration ? ` (${s.duration} min)` : ''}`;
+    else {
+      const moved = old && s.date !== old.date ? ` (flyttas till ${dayLabel(s.date)})` : '';
+      label = old ? `${dayLabel(old.date)}: ${old.title} → ${s.title}${moved}` : `Ändra: ${s.title}`;
+    }
+    return { ...c, label };
+  });
+}
+
+function applyChanges(program, changes) {
+  let skipped = 0;
+  const fields = (s) => ({
+    title: s.title,
+    date: s.date,
+    duration: s.duration ?? null,
+    intensity: s.intensity,
+    description: s.description,
+    exercises: s.exercises?.length ? s.exercises.map((e) => ({ name: e.name, sets: e.sets, load: e.load || undefined })) : undefined,
+    edited: true,
+  });
+  const remove = (id) => program.weekList.forEach((w) => (w.sessions = w.sessions.filter((x) => x.id !== id)));
+  for (const c of changes) {
+    const old = c.id ? findSession(program, c.id) : null;
+    if (c.action === 'delete') {
+      if (old) remove(old.id);
+      else skipped++;
+      continue;
+    }
+    const week = c.session && weekForDate(program, c.session.date);
+    if (!week || (c.action === 'update' && !old)) {
+      skipped++;
+      continue;
+    }
+    if (old) remove(old.id);
+    week.sessions.push(c.action === 'update'
+      ? { ...old, ...fields(c.session) }
+      : { id: uid(), type: 'egen', done: false, ...fields(c.session) });
+  }
+  program.weekList.forEach(sortWeek);
+  return skipped;
+}
+
+// Läser felmeddelandet från funktionen om det finns ett.
+async function functionError(error) {
+  try {
+    const body = await error.context.json();
+    if (body?.error) return body.error;
+  } catch { /* inget JSON-svar */ }
+  return 'Kunde inte nå AI-chatten. Försök igen om en stund.';
+}
+
+async function sendChat(text) {
+  const program = await DataStore.getProgram(chat.programId);
+  const history = chat.messages.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content }));
+  chat.messages.push({ role: 'user', content: text });
+  chat.busy = true;
+  await rerenderProgram();
+  try {
+    const { data, error } = await DataStore.client.functions.invoke('plan-chat', {
+      body: { message: text, program: programForAI(program), history },
+    });
+    if (error) throw new Error(await functionError(error));
+    if (data?.error) throw new Error(data.error);
+    const changes = describeChanges(program, data.changes || []);
+    chat.messages.push({ role: 'assistant', content: data.reply, changes, status: changes.length ? 'pending' : null });
+  } catch (err) {
+    chat.messages.push({ role: 'assistant', content: err.message, error: true });
+  }
+  chat.busy = false;
+  await rerenderProgram();
+  programView.querySelector('.chat-log')?.lastElementChild?.scrollIntoView({ block: 'nearest' });
+}
+
+programView.addEventListener('submit', async (e) => {
+  if (!e.target.matches('[data-chat-form]')) return;
+  e.preventDefault();
+  const text = e.target.elements.message.value.trim();
+  if (text && !chat.busy) await sendChat(text);
+});
+
+programView.addEventListener('keydown', (e) => {
+  // Enter skickar, Shift+Enter ger ny rad.
+  if (e.key === 'Enter' && !e.shiftKey && e.target.matches('.chat-form textarea')) {
+    e.preventDefault();
+    e.target.form.requestSubmit();
+  }
+});
+
+programView.addEventListener('toggle', (e) => {
+  if (e.target.matches('details.ai-chat')) chat.open = e.target.open;
+}, true);
+
+programView.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action="chat-apply"], [data-action="chat-reject"]');
+  if (!btn) return;
+  const m = chat.messages[Number(btn.dataset.index)];
+  if (!m || m.status !== 'pending') return;
+  if (btn.dataset.action === 'chat-apply') {
+    const program = await DataStore.getProgram(chat.programId);
+    const skipped = applyChanges(program, m.changes);
+    await DataStore.saveProgram(program);
+    if (skipped) toast(`${skipped} ändring(ar) kunde inte genomföras (passet fanns inte eller datumet låg utanför programmet).`, 'error');
+    m.status = 'applied';
+  } else {
+    m.status = 'rejected';
+  }
+  await rerenderProgram();
 });
 
 // ---- Journal ----
@@ -417,7 +805,7 @@ $('#view-journal').addEventListener('click', async (e) => {
 const TEASERS = {
   skapa: {
     title: 'Skapa ett träningsprogram',
-    text: 'Berätta vad du vill uppnå – ett lopp, en tävling eller bättre form – och hur lång tid du har. Planfit bygger ett schema vecka för vecka, anpassat efter din nivå och hur ofta du vill träna.',
+    text: 'Berätta vad du vill uppnå – ett lopp, en tävling eller bättre form – och hur lång tid du har. Fitsphere bygger ett schema vecka för vecka, anpassat efter din nivå och hur ofta du vill träna.',
     points: [
       'Löpning, cykling, Hyrox, styrketräning – eller hybrid där du blandar fritt',
       'Välj antal veckor – eller räkna bakåt från tävlingsdagen',
@@ -554,7 +942,8 @@ logForm.addEventListener('submit', async (e) => {
   await DataStore.addEntry(entry);
   if (entry.programId) await setSessionDone(entry.programId, entry.sessionId, true);
   logDialog.close();
-  await route();
+  if (location.hash.startsWith('#program/')) await rerenderProgram();
+  else await route();
 });
 
 // ---- Konto ----
