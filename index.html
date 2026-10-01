@@ -2,9 +2,21 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Fitsphere – träningsprogram efter ditt mål</title>
+  <meta name="description" content="Skapa träningsprogram efter ditt mål och för journal över träningen.">
   <link rel="stylesheet" href="css/style.css">
+
+  <!-- Installera som app (PWA) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#181f1c" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fitsphere">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
   <header class="topbar">
@@ -367,6 +379,17 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
+
+  <!-- Tips om att installera appen (visas en gång, kan stängas) -->
+  <div id="install-banner" class="install-banner" role="dialog" aria-label="Installera appen" hidden>
+    <img src="icons/icon-192.png" alt="" width="44" height="44">
+    <div class="install-text">
+      <strong>Installera Fitsphere</strong>
+      <span id="install-hint">Lägg appen på hemskärmen – då öppnas den direkt, utan webbläsare.</span>
+    </div>
+    <button type="button" class="btn small primary" id="install-button" hidden>Installera</button>
+    <button type="button" class="icon-btn" id="install-close" aria-label="Stäng">✕</button>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>

@@ -22,4 +22,4 @@ Så slås den på:
 
 ## Övrigt
 
-- Publicera sidan med GitHub Pages så att den får en riktig adress. Sätt sedan Site URL i Supabase och slå på "Confirm email" igen.
+- Slå på "Confirm email" i Supabase igen (Authentication → Sign In / Providers → Email). Då måste nya konton bekräfta sin e-post. Site URL måste först vara satt till https://ludvigruckert.github.io/fitsphere/.

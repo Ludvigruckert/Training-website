@@ -2,6 +2,8 @@
 
 Skapa träningsprogram utifrån mål, tidsperiod och nivå – och för journal över träningen.
 
+**Live:** https://ludvigruckert.github.io/fitsphere/
+
 ## Funktioner
 
 - **Programgenerator** – välj syfte (tävling, kondition, styrka, muskler, viktnedgång, hälsa), träningsform (löpning, cykling, Hyrox, styrketräning eller hybrid), antal veckor eller måldatum, 2–12 pass per vecka, antal träningsdagar och nivå. Programmet delas in i faser (bas → uppbyggnad → topp → nedtrappning) med återhämtningsveckor. Fler pass än träningsdagar ger dubbelpass.
@@ -9,6 +11,7 @@ Skapa träningsprogram utifrån mål, tidsperiod och nivå – och för journal 
 - **Prestationsbaserat** – nuvarande löptider (5/10/21,1 km) och måltid ger tempon i passen (Jack Daniels VDOT); 1RM ger vikter i kg för styrkepassen.
 - **Redigera pass** – ändra, flytta, lägg till eller ta bort pass och övningar.
 - **AI-chatt** – beskriv en ändring i fritext; AI:n (Claude, via Supabase-funktionen `supabase/functions/plan-chat`) föreslår ändringar som du godkänner. **Avstängd tills vidare** (kostar pengar) – se `KOM-IHAG.md`.
+- **Installera som app (PWA)** – lägg Fitsphere på hemskärmen från webbläsaren (iPhone: Dela → Lägg till på hemskärmen, Android: Installera). `manifest.webmanifest` + `sw.js` + ikoner i `icons/`.
 - **Konton** – logga in med e-post och lösenord (Supabase). Program och journal sparas på kontot.
 - **Träningsjournal** – logga pass med tid, distans, känsla och anteckningar. Pass kan loggas direkt från programmet och markeras då som klara.
 

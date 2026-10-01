@@ -23,9 +23,16 @@ const PROTECTED = ['skapa', 'program', 'journal'];
 
 async function route() {
   let [view, id] = location.hash.slice(1).split('/');
-  if (![...PROTECTED, 'hem', 'login'].includes(view)) view = 'hem';
-
   const loggedOut = Auth.needsLogin();
+  if (![...PROTECTED, 'hem', 'login'].includes(view)) {
+    // Öppnas appen från hemskärmen och man är inloggad: gå direkt till programmen.
+    if (isStandalone() && !loggedOut) {
+      location.replace('#program');
+      return;
+    }
+    view = 'hem';
+  }
+
   $('#main-nav').hidden = Auth.recovering;
   $('#user-menu').hidden = !Auth.user || Auth.recovering;
   $('#login-link').hidden = !loggedOut || Auth.recovering;
@@ -52,6 +59,63 @@ async function route() {
   if (view === 'journal') await renderJournal();
 }
 window.addEventListener('hashchange', () => route().then(() => window.scrollTo(0, 0)));
+
+// ---- Installera som app (PWA) ----
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+// Service workern kräver http(s) – den registreras inte när filen öppnas direkt från datorn.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Service worker kunde inte registreras', err));
+  });
+}
+
+const installBanner = $('#install-banner');
+let installPrompt = null;
+
+function installDismissed() {
+  try {
+    return localStorage.getItem('tp.installDismissed') === '1';
+  } catch {
+    return false;
+  }
+}
+
+// mode: 'prompt' = webbläsaren kan installera direkt (Android/Chrome), 'ios' = visa instruktioner.
+function showInstallBanner(mode) {
+  if (isStandalone() || installDismissed()) return;
+  $('#install-button').hidden = mode !== 'prompt';
+  if (mode === 'ios') {
+    $('#install-hint').innerHTML = `Tryck på <b>Dela</b>
+      <svg class="share-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4M5 11v9h14v-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      och välj <b>Lägg till på hemskärmen</b>.`;
+  }
+  installBanner.hidden = false;
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  showInstallBanner('prompt');
+});
+$('#install-button').addEventListener('click', async () => {
+  installBanner.hidden = true;
+  await installPrompt?.prompt();
+  installPrompt = null;
+});
+$('#install-close').addEventListener('click', () => {
+  installBanner.hidden = true;
+  try {
+    localStorage.setItem('tp.installDismissed', '1');
+  } catch { /* privat läge – banderollen visas igen nästa gång */ }
+});
+window.addEventListener('appinstalled', () => (installBanner.hidden = true));
+
+// iPhone och iPad saknar installationsknapp i webbläsaren – visa hur man gör i stället.
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (isIOS && !isStandalone()) setTimeout(() => showInstallBanner('ios'), 2500);
 
 // ---- Startsida ----
 function renderHome(loggedOut) {
